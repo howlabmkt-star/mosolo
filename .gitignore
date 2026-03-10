@@ -1,0 +1,34 @@
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.g.dart
+*.freezed.dart
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# 환경/시크릿
+.env
+.env.local
+google-services.json
+GoogleService-Info.plist
+*.keystore
+*.jks
+*.p12
+*.p8
+
+# 빌드 아티팩트
+*.apk
+*.aab
+*.ipa
+
+# OS
+.DS_Store
+Thumbs.db

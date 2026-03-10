@@ -1,0 +1,54 @@
+name: solo_simkung
+description: 솔로의 심쿵감지기 - AI 관계 분석 앱
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase (Flutter 3.27 호환 최신 버전)
+  firebase_core: ^3.13.1
+  firebase_auth: ^5.5.4
+  cloud_firestore: ^5.6.8
+  cloud_functions: ^5.4.1
+  firebase_analytics: ^11.4.4
+  firebase_crashlytics: ^4.3.4
+
+  # 결제
+  purchases_flutter: ^6.30.2  # RevenueCat
+
+  # OCR
+  google_mlkit_text_recognition: ^0.11.0
+
+  # 파일 선택
+  file_picker: ^6.2.1
+
+  # 이미지 선택
+  image_picker: ^1.2.0
+
+  # UI
+  go_router: ^13.2.5
+  flutter_riverpod: ^2.6.1
+  cached_network_image: ^3.4.1
+  fl_chart: ^0.66.2
+  share_plus: ^7.2.2
+  lottie: ^3.3.1
+
+  # 유틸
+  shared_preferences: ^2.5.3
+  intl: ^0.19.0
+  uuid: ^4.5.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.2
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/

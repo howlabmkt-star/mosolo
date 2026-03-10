@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 사용자 문서: 본인만 읽기, 쓰기는 Cloud Functions만
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false; // Cloud Functions에서만 수정
+
+      // 분석 기록: 본인만 읽기
+      match /analyses/{analysisId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+    }
+
+    // MBTI 캐시: 로그인한 모든 유저 읽기, 쓰기는 Cloud Functions만
+    match /mbtiCache/{cacheId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}
