@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
-import '../services/gpt_service.dart';
+import '../services/analysis_service.dart';
 import '../models/mbti_result.dart';
 
 // MBTI 16종
@@ -12,8 +12,8 @@ const mbtiTypes = [
   'ISTP', 'ISFP', 'ESTP', 'ESFP',
 ];
 
-final mbtiStateProvider = StateNotifierProvider<MbtiNotifier, MbtiState>(
-  (ref) => MbtiNotifier(ref.read(gptServiceProvider)),
+final mbtiStateProvider = StateNotifierProvider.autoDispose<MbtiNotifier, MbtiState>(
+  (ref) => MbtiNotifier(ref.read(analysisServiceProvider)),
 );
 
 class MbtiState {
@@ -47,8 +47,8 @@ class MbtiState {
 }
 
 class MbtiNotifier extends StateNotifier<MbtiState> {
-  final GptService _gptService;
-  MbtiNotifier(this._gptService) : super(const MbtiState());
+  final AnalysisService _service;
+  MbtiNotifier(this._service) : super(const MbtiState());
 
   void selectMy(String mbti) => state = state.copyWith(myMbti: mbti);
   void selectTheir(String mbti) => state = state.copyWith(theirMbti: mbti);
@@ -57,10 +57,10 @@ class MbtiNotifier extends StateNotifier<MbtiState> {
     if (state.myMbti == null || state.theirMbti == null) return;
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final result = await _gptService.analyzeMbti(state.myMbti!, state.theirMbti!);
+      final result = await _service.analyzeMbti(state.myMbti!, state.theirMbti!);
       state = state.copyWith(isLoading: false, result: result);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: '분석 중 오류가 발생했습니다.');
     }
   }
 }
