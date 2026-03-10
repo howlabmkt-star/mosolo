@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../services/payment_service.dart';
+import '../services/web_payment_service.dart';
 
 class PaywallScreen extends ConsumerStatefulWidget {
   const PaywallScreen({super.key});
@@ -11,7 +14,7 @@ class PaywallScreen extends ConsumerStatefulWidget {
 
 class _PaywallScreenState extends ConsumerState<PaywallScreen> {
   bool _isLoading = false;
-  int _selectedPack = 0; // 0: 1회 990원, 1: 5회 4400원, 2: 10회 7900원
+  int _selectedPack = 0;
 
   final _packs = [
     {'label': '1회 분석권', 'price': '990원', 'unit': '990원/건', 'productId': 'credit_1'},
@@ -22,10 +25,23 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
   Future<void> _purchase() async {
     setState(() => _isLoading = true);
     try {
-      final service = ref.read(paymentServiceProvider);
       final productId = _packs[_selectedPack]['productId']!;
-      await service.purchaseCredits(productId);
-      if (mounted) Navigator.of(context).pop(true);
+
+      if (kIsWeb) {
+        // 웹: 토스페이먼츠 결제창 (orderId = productId_uuid 형식)
+        final orderId = '${productId}_${const Uuid().v4().replaceAll('-', '').substring(0, 12)}';
+        ref.read(webPaymentServiceProvider).requestPayment(
+          productId: productId,
+          orderId: orderId,
+        );
+        // 결제창이 열리며 페이지 이동됨 - 로딩만 해제
+        if (mounted) setState(() => _isLoading = false);
+      } else {
+        // 앱: RevenueCat 인앱결제
+        final service = ref.read(paymentServiceProvider);
+        await service.purchaseCredits(productId);
+        if (mounted) Navigator.of(context).pop(true);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -61,10 +77,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
             const Text('커피 한 잔 가격으로 그 사람의 진심을 알아보세요',
               style: TextStyle(color: Colors.grey, fontSize: 14),
               textAlign: TextAlign.center),
-
             const SizedBox(height: 24),
-
-            // 무엇을 얻나요
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -84,10 +97,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                 ],
               ),
             ),
-
             const SizedBox(height: 20),
-
-            // 결제 팩 선택
             ...List.generate(_packs.length, (i) {
               final pack = _packs[i];
               final isSelected = _selectedPack == i;
@@ -127,9 +137,7 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                 ),
               );
             }),
-
             const SizedBox(height: 24),
-
             SizedBox(
               width: double.infinity,
               height: 56,
@@ -148,13 +156,12 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                     ),
               ),
             ),
-
             const SizedBox(height: 16),
-            const Text(
-              '• 결제는 Google Play / App Store를 통해 처리됩니다\n'
-              '• 크레딧은 만료되지 않습니다\n'
-              '• 참고용이며 절대적 판단 기준이 아닙니다',
-              style: TextStyle(fontSize: 11, color: Colors.grey, height: 1.7),
+            Text(
+              kIsWeb
+                ? '• 결제는 토스페이먼츠를 통해 안전하게 처리됩니다\n• 크레딧은 만료되지 않습니다\n• 참고용이며 절대적 판단 기준이 아닙니다'
+                : '• 결제는 Google Play / App Store를 통해 처리됩니다\n• 크레딧은 만료되지 않습니다\n• 참고용이며 절대적 판단 기준이 아닙니다',
+              style: const TextStyle(fontSize: 11, color: Colors.grey, height: 1.7),
               textAlign: TextAlign.center,
             ),
           ],

@@ -67,8 +67,9 @@ class _PolicyContent extends StatelessWidget {
       _PolicySection(
         title: '5. 제3자 서비스',
         content: '• Firebase (Google): 인증, 데이터베이스, 분석\n'
-          '• OpenAI: AI 분석 처리 (원문 전달 후 즉시 삭제)\n'
-          '• RevenueCat: 인앱결제 처리\n\n'
+          '• Google Gemini AI: AI 분석 처리 (원문 전달 후 즉시 삭제, 서버 측에서만 처리)\n'
+          '• 토스페이먼츠: 웹 결제 처리\n'
+          '• RevenueCat: 앱 인앱결제 처리\n\n'
           '각 서비스의 개인정보처리방침을 참고하세요.',
       ),
       _PolicySection(
