@@ -2,6 +2,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/analysis_result.dart';
 import '../models/mbti_result.dart';
+import '../models/saju_result.dart';
 
 final analysisServiceProvider = Provider<AnalysisService>((ref) => AnalysisService());
 
@@ -28,5 +29,47 @@ class AnalysisService {
     final callable = _functions.httpsCallable('analyzeMbti');
     final result = await callable.call({'myMbti': myMbti, 'theirMbti': theirMbti});
     return MbtiResult.fromJson(Map<String, dynamic>.from(result.data as Map));
+  }
+
+  Future<MbtiResult> analyzeMbtiSaju({
+    required String myMbti,
+    required String theirMbti,
+    required String myBirthDate,
+    required String theirBirthDate,
+    int? myBirthHour,
+    int? theirBirthHour,
+  }) async {
+    final callable = _functions.httpsCallable(
+      'analyzeMbtiSaju',
+      options: HttpsCallableOptions(timeout: const Duration(seconds: 60)),
+    );
+    final result = await callable.call({
+      'myMbti': myMbti,
+      'theirMbti': theirMbti,
+      'myBirthDate': myBirthDate,
+      'theirBirthDate': theirBirthDate,
+      if (myBirthHour != null) 'myBirthHour': myBirthHour,
+      if (theirBirthHour != null) 'theirBirthHour': theirBirthHour,
+    });
+    return MbtiResult.fromJson(Map<String, dynamic>.from(result.data as Map));
+  }
+
+  Future<SajuResult> analyzeSaju({
+    required String birthDate,
+    int? birthHour,
+    required String gender,
+    String? question,
+  }) async {
+    final callable = _functions.httpsCallable(
+      'analyzeSaju',
+      options: HttpsCallableOptions(timeout: const Duration(seconds: 60)),
+    );
+    final result = await callable.call({
+      'birthDate': birthDate,
+      'gender': gender,
+      if (birthHour != null) 'birthHour': birthHour,
+      if (question != null && question.isNotEmpty) 'question': question,
+    });
+    return SajuResult.fromJson(Map<String, dynamic>.from(result.data as Map));
   }
 }

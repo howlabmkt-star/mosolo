@@ -52,6 +52,16 @@ class _KakaoNotifier extends StateNotifier<_KakaoState> {
 
   _KakaoNotifier(this._service, this._creditService) : super(const _KakaoState());
 
+  void setTextContent(String text) {
+    if (text.trim().isEmpty) return;
+    state = state.copyWith(
+      fileName: '직접 입력',
+      fileContent: text,
+      freeResult: null,
+      error: null,
+    );
+  }
+
   Future<void> pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -155,7 +165,11 @@ class KakaoAnalysisScreen extends ConsumerWidget {
           children: [
             _GuideCard(),
             const SizedBox(height: 20),
-            _FileUploadArea(fileName: state.fileName, onTap: () => notifier.pickFile()),
+            _InputSection(
+              fileName: state.fileName,
+              onFilePick: () => notifier.pickFile(),
+              onTextSet: (t) => notifier.setTextContent(t),
+            ),
             const SizedBox(height: 14),
             _AnalyzeButton(
               enabled: state.fileContent != null && !state.isLoading,
@@ -223,36 +237,173 @@ class _GuideCard extends StatelessWidget {
   }
 }
 
-class _FileUploadArea extends StatelessWidget {
+// 파일 업로드 OR 텍스트 붙여넣기 선택 위젯
+class _InputSection extends StatefulWidget {
   final String? fileName;
-  final VoidCallback onTap;
+  final VoidCallback onFilePick;
+  final ValueChanged<String> onTextSet;
 
-  const _FileUploadArea({required this.fileName, required this.onTap});
+  const _InputSection({required this.fileName, required this.onFilePick, required this.onTextSet});
+
+  @override
+  State<_InputSection> createState() => _InputSectionState();
+}
+
+class _InputSectionState extends State<_InputSection> with SingleTickerProviderStateMixin {
+  late TabController _tab;
+  final _textCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    _textCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final hasFile = fileName != null;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity, height: 110,
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // 탭 선택
+      Container(
         decoration: BoxDecoration(
-          border: Border.all(color: hasFile ? const Color(0xFFFF6B9D) : Colors.grey.shade300, width: 2),
-          borderRadius: BorderRadius.circular(12),
-          color: hasFile ? const Color(0xFFFFF0F5) : Colors.grey.shade50,
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(10),
         ),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(hasFile ? Icons.check_circle : Icons.upload_file, size: 34,
-            color: hasFile ? const Color(0xFFFF6B9D) : Colors.grey),
-          const SizedBox(height: 8),
-          Text(
-            hasFile ? fileName! : 'txt 파일 탭하여 업로드',
-            style: TextStyle(color: hasFile ? const Color(0xFFFF6B9D) : Colors.grey, fontWeight: FontWeight.w500),
-            maxLines: 1, overflow: TextOverflow.ellipsis,
+        child: TabBar(
+          controller: _tab,
+          labelColor: const Color(0xFFFF6B9D),
+          unselectedLabelColor: Colors.grey,
+          indicator: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 4)],
           ),
-        ]),
+          indicatorSize: TabBarIndicatorSize.tab,
+          tabs: const [
+            Tab(text: '📁 파일 업로드'),
+            Tab(text: '✂️ 텍스트 붙여넣기'),
+          ],
+        ),
       ),
-    );
+      const SizedBox(height: 12),
+      SizedBox(
+        height: 160,
+        child: TabBarView(
+          controller: _tab,
+          children: [
+            // 파일 업로드 탭
+            GestureDetector(
+              onTap: widget.onFilePick,
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: widget.fileName != null ? const Color(0xFFFF6B9D) : Colors.grey.shade300,
+                    width: 2,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  color: widget.fileName != null ? const Color(0xFFFFF0F5) : Colors.grey.shade50,
+                ),
+                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(
+                    widget.fileName != null ? Icons.check_circle : Icons.upload_file,
+                    size: 36,
+                    color: widget.fileName != null ? const Color(0xFFFF6B9D) : Colors.grey,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    widget.fileName != null ? widget.fileName! : 'txt 파일 탭하여 업로드',
+                    style: TextStyle(
+                      color: widget.fileName != null ? const Color(0xFFFF6B9D) : Colors.grey,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                  ),
+                  if (widget.fileName == null) ...[
+                    const SizedBox(height: 4),
+                    Text('카카오톡 내보내기 → txt 선택',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                  ],
+                ]),
+              ),
+            ),
+
+            // 텍스트 붙여넣기 탭
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(children: [
+                Expanded(
+                  child: TextField(
+                    controller: _textCtrl,
+                    maxLines: null,
+                    expands: true,
+                    decoration: const InputDecoration(
+                      hintText: '카카오톡 대화 내용을 여기에 붙여넣기 (Ctrl+V)\n\n예: 2024년 1월 1일\n상대방: 오늘 뭐해?\n나: 집에 있어~',
+                      hintStyle: TextStyle(fontSize: 12, color: Colors.grey),
+                      contentPadding: EdgeInsets.all(12),
+                      border: InputBorder.none,
+                    ),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(10),
+                      bottomRight: Radius.circular(10),
+                    ),
+                  ),
+                  child: Row(children: [
+                    TextButton.icon(
+                      onPressed: () async {
+                        final data = await Clipboard.getData(Clipboard.kTextPlain);
+                        if (data?.text != null) {
+                          _textCtrl.text = data!.text!;
+                        }
+                      },
+                      icon: const Icon(Icons.paste, size: 16),
+                      label: const Text('클립보드 붙여넣기', style: TextStyle(fontSize: 12)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFFFF6B9D),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: Size.zero,
+                      ),
+                    ),
+                    const Spacer(),
+                    ElevatedButton(
+                      onPressed: () {
+                        if (_textCtrl.text.trim().isNotEmpty) {
+                          widget.onTextSet(_textCtrl.text);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF6B9D),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        minimumSize: Size.zero,
+                        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                      child: const Text('적용'),
+                    ),
+                  ]),
+                ),
+              ]),
+            ),
+          ],
+        ),
+      ),
+    ]);
   }
 }
 
