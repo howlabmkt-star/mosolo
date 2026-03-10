@@ -11,6 +11,7 @@ import 'screens/breakup_calculator_screen.dart';
 import 'screens/paywall_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/privacy_policy_screen.dart';
+import 'screens/payment_result_screen.dart';
 
 Future<String> _initialLocation() async {
   final prefs = await SharedPreferences.getInstance();
@@ -69,5 +70,28 @@ final appRouter = GoRouter(
     GoRoute(path: '/paywall', builder: (_, __) => const PaywallScreen()),
     GoRoute(path: '/privacy', builder: (_, __) => const PrivacyPolicyScreen()),
     GoRoute(path: '/terms', builder: (_, __) => const TermsScreen()),
+
+    // 토스페이먼츠 결제 결과 (웹)
+    GoRoute(
+      path: '/payment/success',
+      builder: (context, state) {
+        final params = state.uri.queryParameters;
+        return PaymentSuccessScreen(
+          paymentKey: params['paymentKey'] ?? '',
+          orderId: params['orderId'] ?? '',
+          amount: int.tryParse(params['amount'] ?? '0') ?? 0,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/payment/fail',
+      builder: (context, state) {
+        final params = state.uri.queryParameters;
+        return PaymentFailScreen(
+          errorCode: params['code'],
+          errorMessage: params['message'],
+        );
+      },
+    ),
   ],
 );

@@ -32,3 +32,7 @@ GoogleService-Info.plist
 # OS
 .DS_Store
 Thumbs.db
+
+# Node.js (루트 package.json용)
+node_modules/
+package-lock.json

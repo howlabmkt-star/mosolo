@@ -1,14 +1,12 @@
 import * as functions from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 admin.initializeApp();
 const db = admin.firestore();
 
-// OpenAI 클라이언트 (함수 실행 시마다 재사용)
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Gemini 클라이언트 (API 키는 Cloud Functions 환경변수에만 저장 - 클라이언트에 절대 노출 안 됨)
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 // ─── 타입 ───────────────────────────────────────────────────────────────────
 
@@ -23,6 +21,12 @@ interface AnalyzePremiumRequest {
 interface MbtiRequest {
   myMbti: string;
   theirMbti: string;
+}
+
+interface TossConfirmRequest {
+  paymentKey: string;
+  orderId: string;
+  amount: number;
 }
 
 // ─── 헬퍼 ───────────────────────────────────────────────────────────────────
@@ -42,18 +46,19 @@ async function deductCredit(uid: string): Promise<void> {
   });
 }
 
-async function callGpt(systemPrompt: string, userPrompt: string): Promise<string> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    response_format: { type: "json_object" },
-    temperature: 0.7,
-    max_tokens: 1000,
+async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    systemInstruction: systemPrompt,
+    generationConfig: {
+      responseMimeType: "application/json",
+      temperature: 0.7,
+      maxOutputTokens: 1000,
+    } as any,
   });
-  return response.choices[0].message.content ?? "{}";
+
+  const result = await model.generateContent(userPrompt);
+  return result.response.text();
 }
 
 // ─── 무료 분석 (호감도 점수 + 한 줄 요약) ────────────────────────────────────
@@ -71,7 +76,7 @@ export const analyzeFree = functions.onCall(
     // 최근 200줄만 처리 (토큰 절약)
     const trimmed = chatContent.split("\n").slice(-200).join("\n");
 
-    const result = await callGpt(
+    const result = await callGemini(
       `당신은 연애 심리 전문가입니다. 카카오톡 대화를 분석해 상대방의 호감도를 측정합니다.
 반드시 아래 JSON 형식으로만 응답하세요:
 {"score": <0~100 정수>, "summary": "<20자 이내 한 줄 요약>"}`,
@@ -98,7 +103,7 @@ export const analyzePremium = functions.onCall(
 
     const { chatContent } = request.data as AnalyzePremiumRequest;
 
-    const result = await callGpt(
+    const result = await callGemini(
       `당신은 연애 심리 전문가입니다. 카카오톡 대화를 심층 분석합니다.
 반드시 아래 JSON 형식으로만 응답하세요:
 {
@@ -144,7 +149,7 @@ export const analyzeMbti = functions.onCall(
       return { ...data, myMbti, theirMbti };
     }
 
-    const result = await callGpt(
+    const result = await callGemini(
       `당신은 MBTI 전문가입니다. 두 MBTI의 연애 궁합을 팩폭 스타일로 분석합니다.
 반드시 아래 JSON 형식으로만 응답하세요:
 {
@@ -164,7 +169,55 @@ export const analyzeMbti = functions.onCall(
   }
 );
 
-// ─── RevenueCat Webhook (크레딧 충전) ─────────────────────────────────────────
+// ─── 토스페이먼츠 결제 확인 (카드사 심사용 웹 결제) ──────────────────────────
+
+export const confirmTossPayment = functions.onCall(
+  { region: "asia-northeast3", memory: "256MiB", timeoutSeconds: 30 },
+  async (request) => {
+    if (!request.auth) throw new functions.HttpsError("unauthenticated", "로그인이 필요합니다");
+    const uid = request.auth.uid;
+
+    const { paymentKey, orderId, amount } = request.data as TossConfirmRequest;
+
+    // 토스페이먼츠 결제 승인 API (시크릿 키는 서버에만 - 클라이언트 절대 노출 안 됨)
+    const secretKey = process.env.TOSS_SECRET_KEY!;
+    const credentials = Buffer.from(`${secretKey}:`).toString("base64");
+
+    const response = await fetch("https://api.tosspayments.com/v1/payments/confirm", {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${credentials}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ paymentKey, orderId, amount }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json() as any;
+      throw new functions.HttpsError("internal", error.message || "결제 확인 실패");
+    }
+
+    // orderId 형식: credit_1_{uuid}, credit_5_{uuid}, credit_10_{uuid}
+    const productId = orderId.split("_").slice(0, 2).join("_");
+    const creditMap: Record<string, number> = {
+      credit_1: 1,
+      credit_5: 5,
+      credit_10: 10,
+    };
+
+    const creditsToAdd = creditMap[productId];
+    if (!creditsToAdd) throw new functions.HttpsError("invalid-argument", "알 수 없는 상품");
+
+    await db.collection("users").doc(uid).set(
+      { credits: admin.firestore.FieldValue.increment(creditsToAdd) },
+      { merge: true }
+    );
+
+    return { success: true, creditsAdded: creditsToAdd };
+  }
+);
+
+// ─── RevenueCat Webhook (앱 크레딧 충전) ─────────────────────────────────────
 
 export const revenuecatWebhook = functions.onRequest(
   { region: "asia-northeast3" },

@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
@@ -12,14 +15,16 @@ import 'premium_result_screen.dart';
 class _KakaoState {
   final bool isLoading;
   final bool isPremiumLoading;
-  final String? filePath;
+  final String? fileName;     // 표시용 파일명
+  final String? fileContent;  // 실제 텍스트 내용 (웹/모바일 공통)
   final AnalysisResult? freeResult;
   final String? error;
 
   const _KakaoState({
     this.isLoading = false,
     this.isPremiumLoading = false,
-    this.filePath,
+    this.fileName,
+    this.fileContent,
     this.freeResult,
     this.error,
   });
@@ -27,13 +32,15 @@ class _KakaoState {
   _KakaoState copyWith({
     bool? isLoading,
     bool? isPremiumLoading,
-    String? filePath,
+    String? fileName,
+    String? fileContent,
     AnalysisResult? freeResult,
     String? error,
   }) => _KakaoState(
     isLoading: isLoading ?? this.isLoading,
     isPremiumLoading: isPremiumLoading ?? this.isPremiumLoading,
-    filePath: filePath ?? this.filePath,
+    fileName: fileName ?? this.fileName,
+    fileContent: fileContent ?? this.fileContent,
     freeResult: freeResult ?? this.freeResult,
     error: error ?? this.error,
   );
@@ -49,17 +56,36 @@ class _KakaoNotifier extends StateNotifier<_KakaoState> {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['txt'],
+      withData: kIsWeb, // 웹에서는 bytes로 직접 읽기
     );
-    if (result != null) {
-      state = state.copyWith(filePath: result.files.single.path, freeResult: null);
+    if (result == null) return;
+
+    final file = result.files.single;
+    String? content;
+
+    if (kIsWeb && file.bytes != null) {
+      // 웹: bytes → UTF-8 문자열 변환
+      content = utf8.decode(file.bytes!);
+    } else if (!kIsWeb && file.path != null) {
+      // 모바일/데스크톱: 파일 경로로 읽기
+      content = await File(file.path!).readAsString();
+    }
+
+    if (content != null) {
+      state = state.copyWith(
+        fileName: file.name,
+        fileContent: content,
+        freeResult: null,
+        error: null,
+      );
     }
   }
 
   Future<void> analyzeFree() async {
-    if (state.filePath == null) return;
+    if (state.fileContent == null) return;
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final result = await _service.analyzeFree(state.filePath!);
+      final result = await _service.analyzeFree(state.fileContent!);
       state = state.copyWith(isLoading: false, freeResult: result);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '분석 중 오류가 발생했습니다.\n잠시 후 다시 시도해주세요.');
@@ -67,13 +93,13 @@ class _KakaoNotifier extends StateNotifier<_KakaoState> {
   }
 
   Future<AnalysisResult?> analyzePremium() async {
-    if (state.filePath == null) return null;
+    if (state.fileContent == null) return null;
     final hasCredit = await _creditService.hasCredits();
     if (!hasCredit) return null;
 
     state = state.copyWith(isPremiumLoading: true, error: null);
     try {
-      final result = await _service.analyzePremium(state.filePath!);
+      final result = await _service.analyzePremium(state.fileContent!);
       state = state.copyWith(isPremiumLoading: false);
       return result;
     } catch (e) {
@@ -129,10 +155,10 @@ class KakaoAnalysisScreen extends ConsumerWidget {
           children: [
             _GuideCard(),
             const SizedBox(height: 20),
-            _FileUploadArea(filePath: state.filePath, onTap: () => notifier.pickFile()),
+            _FileUploadArea(fileName: state.fileName, onTap: () => notifier.pickFile()),
             const SizedBox(height: 14),
             _AnalyzeButton(
-              enabled: state.filePath != null && !state.isLoading,
+              enabled: state.fileContent != null && !state.isLoading,
               isLoading: state.isLoading,
               onTap: () => notifier.analyzeFree(),
             ),
@@ -198,14 +224,14 @@ class _GuideCard extends StatelessWidget {
 }
 
 class _FileUploadArea extends StatelessWidget {
-  final String? filePath;
+  final String? fileName;
   final VoidCallback onTap;
 
-  const _FileUploadArea({required this.filePath, required this.onTap});
+  const _FileUploadArea({required this.fileName, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final hasFile = filePath != null;
+    final hasFile = fileName != null;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -220,7 +246,7 @@ class _FileUploadArea extends StatelessWidget {
             color: hasFile ? const Color(0xFFFF6B9D) : Colors.grey),
           const SizedBox(height: 8),
           Text(
-            hasFile ? filePath!.split('/').last : 'txt 파일 탭하여 업로드',
+            hasFile ? fileName! : 'txt 파일 탭하여 업로드',
             style: TextStyle(color: hasFile ? const Color(0xFFFF6B9D) : Colors.grey, fontWeight: FontWeight.w500),
             maxLines: 1, overflow: TextOverflow.ellipsis,
           ),
