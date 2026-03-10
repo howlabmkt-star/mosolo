@@ -5,8 +5,11 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 admin.initializeApp();
 const db = admin.firestore();
 
-// Gemini 클라이언트 (API 키는 Cloud Functions 환경변수에만 저장 - 클라이언트에 절대 노출 안 됨)
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+// Gemini API 키는 functions/.env 파일에서 GEMINI_API_KEY=... 로 등록
+// .env 파일은 .gitignore에 포함되어 있으며, Cloud Build 시 Firebase가 자동 주입
+function getGenAI() {
+  return new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+}
 
 // ─── 타입 ───────────────────────────────────────────────────────────────────
 
@@ -63,7 +66,7 @@ async function deductCredit(uid: string): Promise<void> {
 }
 
 async function callGemini(systemPrompt: string, userPrompt: string, maxTokens = 2000): Promise<string> {
-  const model = genAI.getGenerativeModel({
+  const model = getGenAI().getGenerativeModel({
     model: "gemini-2.0-flash",
     systemInstruction: systemPrompt,
     generationConfig: {
