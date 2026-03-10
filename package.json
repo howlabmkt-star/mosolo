@@ -1,0 +1,15 @@
+{
+  "name": "solo-simkung-web",
+  "version": "1.0.0",
+  "description": "솔로의 심쿵감지기 - Flutter Web 빌드 & 배포",
+  "scripts": {
+    "verify-build": "flutter build web --release && firebase deploy --only hosting --non-interactive",
+    "build": "flutter build web --release",
+    "deploy": "firebase deploy --only hosting --non-interactive",
+    "deploy:all": "firebase deploy --non-interactive",
+    "login": "firebase login"
+  },
+  "devDependencies": {
+    "firebase-tools": "^13.0.0"
+  }
+}
