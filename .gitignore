@@ -35,4 +35,4 @@ Thumbs.db
 
 # Node.js (루트 package.json용)
 node_modules/
-package-lock.json
+/package-lock.json
