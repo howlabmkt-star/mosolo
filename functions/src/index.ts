@@ -1,12 +1,19 @@
 import * as functions from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { defineSecret } from "firebase-functions/params";
 
 admin.initializeApp();
 const db = admin.firestore();
 
-// Gemini 클라이언트 (API 키는 Cloud Functions 환경변수에만 저장 - 클라이언트에 절대 노출 안 됨)
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+// Firebase Secret Manager에 등록된 Gemini API 키
+// firebase functions:secrets:set GEMINI_API_KEY 로 등록
+const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
+
+// Gemini 클라이언트 - 함수 실행 시점에 Secret 값을 읽어서 생성 (모듈 초기화 시점 불가)
+function getGenAI() {
+  return new GoogleGenerativeAI(GEMINI_API_KEY.value());
+}
 
 // ─── 타입 ───────────────────────────────────────────────────────────────────
 
@@ -63,7 +70,7 @@ async function deductCredit(uid: string): Promise<void> {
 }
 
 async function callGemini(systemPrompt: string, userPrompt: string, maxTokens = 2000): Promise<string> {
-  const model = genAI.getGenerativeModel({
+  const model = getGenAI().getGenerativeModel({
     model: "gemini-2.0-flash",
     systemInstruction: systemPrompt,
     generationConfig: {
@@ -80,7 +87,7 @@ async function callGemini(systemPrompt: string, userPrompt: string, maxTokens = 
 // ─── 무료 분석 (호감도 점수 + 한 줄 요약) ────────────────────────────────────
 
 export const analyzeFree = functions.onCall(
-  { region: "asia-northeast3", memory: "256MiB", timeoutSeconds: 30 },
+  { region: "asia-northeast3", memory: "256MiB", timeoutSeconds: 30, secrets: [GEMINI_API_KEY] },
   async (request) => {
     if (!request.auth) throw new functions.HttpsError("unauthenticated", "로그인이 필요합니다");
 
@@ -107,7 +114,7 @@ export const analyzeFree = functions.onCall(
 // ─── 유료 분석 (상세 분석, 크레딧 1개 차감) ─────────────────────────────────
 
 export const analyzePremium = functions.onCall(
-  { region: "asia-northeast3", memory: "512MiB", timeoutSeconds: 60 },
+  { region: "asia-northeast3", memory: "512MiB", timeoutSeconds: 60, secrets: [GEMINI_API_KEY] },
   async (request) => {
     if (!request.auth) throw new functions.HttpsError("unauthenticated", "로그인이 필요합니다");
     const uid = request.auth.uid;
@@ -148,7 +155,7 @@ export const analyzePremium = functions.onCall(
 // ─── MBTI 궁합 (풍부한 콘텐츠, 캐싱 적용) ───────────────────────────────────
 
 export const analyzeMbti = functions.onCall(
-  { region: "asia-northeast3", memory: "256MiB", timeoutSeconds: 45 },
+  { region: "asia-northeast3", memory: "256MiB", timeoutSeconds: 45, secrets: [GEMINI_API_KEY] },
   async (request) => {
     if (!request.auth) throw new functions.HttpsError("unauthenticated", "로그인이 필요합니다");
 
@@ -200,7 +207,7 @@ ${myMbti}가 나이고 ${theirMbti}가 상대방입니다.`,
 // ─── MBTI + 사주 합산 궁합 (실제 역술 기반, 크레딧 1개 차감) ────────────────
 
 export const analyzeMbtiSaju = functions.onCall(
-  { region: "asia-northeast3", memory: "512MiB", timeoutSeconds: 60 },
+  { region: "asia-northeast3", memory: "512MiB", timeoutSeconds: 60, secrets: [GEMINI_API_KEY] },
   async (request) => {
     if (!request.auth) throw new functions.HttpsError("unauthenticated", "로그인이 필요합니다");
     const uid = request.auth.uid;
@@ -263,7 +270,7 @@ export const analyzeMbtiSaju = functions.onCall(
 // ─── 사주 단독 분석 (나의 연애운, 무료) ──────────────────────────────────────
 
 export const analyzeSaju = functions.onCall(
-  { region: "asia-northeast3", memory: "512MiB", timeoutSeconds: 60 },
+  { region: "asia-northeast3", memory: "512MiB", timeoutSeconds: 60, secrets: [GEMINI_API_KEY] },
   async (request) => {
     if (!request.auth) throw new functions.HttpsError("unauthenticated", "로그인이 필요합니다");
 
