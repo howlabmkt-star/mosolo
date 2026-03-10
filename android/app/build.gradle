@@ -1,0 +1,27 @@
+android {
+    namespace "app.simkung.solo"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "app.simkung.solo"
+        minSdk 23        // Firebase Auth Anonymous 지원 최소 버전
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.debug  // TODO: 릴리즈 서명 설정
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+dependencies {
+    implementation 'com.google.firebase:firebase-bom:32.7.0'
+    implementation 'com.google.firebase:firebase-analytics'
+}
+
+apply plugin: 'com.google.gms.google-services'
