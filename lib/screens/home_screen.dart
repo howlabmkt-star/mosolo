@@ -88,6 +88,17 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
 
+                  // 사주 연애운
+                  FeatureCard(
+                    icon: '🀄',
+                    title: '사주로 보는 나의 연애운',
+                    subtitle: '만세력 기반 실제 사주 계산\n내 연애 스타일 · 이상형 · 2025 운세',
+                    badge: '무료',
+                    badgeColor: const Color(0xFF8B4513),
+                    onTap: () => context.push('/saju'),
+                  ),
+                  const SizedBox(height: 12),
+
                   // 손절 계산기
                   FeatureCard(
                     icon: '✂️',

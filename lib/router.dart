@@ -7,6 +7,7 @@ import 'screens/history_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/kakao_analysis_screen.dart';
 import 'screens/mbti_screen.dart';
+import 'screens/saju_screen.dart';
 import 'screens/breakup_calculator_screen.dart';
 import 'screens/paywall_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -46,6 +47,7 @@ final appRouter = GoRouter(
             routes: [
               GoRoute(path: 'kakao', builder: (_, __) => const KakaoAnalysisScreen()),
               GoRoute(path: 'mbti', builder: (_, __) => const MbtiScreen()),
+              GoRoute(path: 'saju', builder: (_, __) => const SajuScreen()),
               GoRoute(path: 'breakup', builder: (_, __) => const BreakupCalculatorScreen()),
             ],
           ),
