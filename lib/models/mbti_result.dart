@@ -12,11 +12,18 @@ class MbtiResult {
   final String myPersonality;
   final String theirPersonality;
 
+  // 5영역 레이더 차트 데이터 (소통력/설렘지수/안정감/성장가능성/위기관리)
+  final Map<String, double>? radarData;
+
   // MBTI + 사주 합산 전용 필드 (null이면 MBTI만)
   final String? sajuAnalysis;
   final String? myPillar;
   final String? theirPillar;
   final String? overallVerdict;
+  final int? destinyScore;     // 천생연분 점수
+  final String? pastLifeStory; // 전생 스토리
+  final String? bestMonth;     // 최고의 달
+  final String? crisisMonth;   // 위기의 달
 
   const MbtiResult({
     required this.myMbti,
@@ -31,10 +38,15 @@ class MbtiResult {
     this.lovePrediction = '',
     this.myPersonality = '',
     this.theirPersonality = '',
+    this.radarData,
     this.sajuAnalysis,
     this.myPillar,
     this.theirPillar,
     this.overallVerdict,
+    this.destinyScore,
+    this.pastLifeStory,
+    this.bestMonth,
+    this.crisisMonth,
   });
 
   bool get isSajuMode => sajuAnalysis != null;
@@ -42,25 +54,38 @@ class MbtiResult {
   factory MbtiResult.fromJson(Map<String, dynamic> json) => MbtiResult(
     myMbti: json['myMbti'] as String,
     theirMbti: json['theirMbti'] as String,
-    compatibilityScore: json['compatibilityScore'] as int,
+    compatibilityScore: (json['compatibilityScore'] as num).toInt(),
     compatibilityTag: json['compatibilityTag'] as String? ?? '',
-    shockLine: json['shockLine'] as String,
-    summary: json['summary'] as String,
+    shockLine: json['shockLine'] as String? ?? '',
+    summary: json['summary'] as String? ?? '',
     heartPounds: _toStringList(json['heartPounds']),
     dangerZones: _toStringList(json['dangerZones']),
     talkTips: _toStringList(json['talkTips']),
     lovePrediction: json['lovePrediction'] as String? ?? '',
     myPersonality: json['myPersonality'] as String? ?? '',
     theirPersonality: json['theirPersonality'] as String? ?? '',
+    radarData: _toRadarData(json['radarData']),
     sajuAnalysis: json['sajuAnalysis'] as String?,
     myPillar: json['myPillar'] as String?,
     theirPillar: json['theirPillar'] as String?,
     overallVerdict: json['overallVerdict'] as String?,
+    destinyScore: (json['destinyScore'] as num?)?.toInt(),
+    pastLifeStory: json['pastLifeStory'] as String?,
+    bestMonth: json['bestMonth'] as String?,
+    crisisMonth: json['crisisMonth'] as String?,
   );
 
   static List<String> _toStringList(dynamic value) {
     if (value == null) return [];
     if (value is List) return value.map((e) => e.toString()).toList();
     return [];
+  }
+
+  static Map<String, double>? _toRadarData(dynamic value) {
+    if (value == null) return null;
+    if (value is Map) {
+      return value.map((k, v) => MapEntry(k.toString(), (v as num).toDouble()));
+    }
+    return null;
   }
 }

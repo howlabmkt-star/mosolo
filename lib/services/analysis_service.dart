@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/analysis_result.dart';
 import '../models/mbti_result.dart';
 import '../models/saju_result.dart';
+import '../models/relationship_result.dart';
 
 final analysisServiceProvider = Provider<AnalysisService>((ref) => AnalysisService());
 
@@ -26,7 +27,10 @@ class AnalysisService {
   }
 
   Future<MbtiResult> analyzeMbti(String myMbti, String theirMbti) async {
-    final callable = _functions.httpsCallable('analyzeMbti');
+    final callable = _functions.httpsCallable(
+      'analyzeMbti',
+      options: HttpsCallableOptions(timeout: const Duration(seconds: 45)),
+    );
     final result = await callable.call({'myMbti': myMbti, 'theirMbti': theirMbti});
     return MbtiResult.fromJson(Map<String, dynamic>.from(result.data as Map));
   }
@@ -71,5 +75,35 @@ class AnalysisService {
       if (question != null && question.isNotEmpty) 'question': question,
     });
     return SajuResult.fromJson(Map<String, dynamic>.from(result.data as Map));
+  }
+
+  Future<RelationshipResult> analyzeRelationship(String behaviorText) async {
+    final callable = _functions.httpsCallable(
+      'analyzeRelationship',
+      options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
+    );
+    final result = await callable.call({'behaviorText': behaviorText});
+    return RelationshipResult.fromJson(Map<String, dynamic>.from(result.data as Map));
+  }
+
+  Future<RelationshipResult> analyzeRelationshipSaju({
+    required String behaviorText,
+    required String myBirthDate,
+    required String theirBirthDate,
+    int? myBirthHour,
+    int? theirBirthHour,
+  }) async {
+    final callable = _functions.httpsCallable(
+      'analyzeRelationshipSaju',
+      options: HttpsCallableOptions(timeout: const Duration(seconds: 60)),
+    );
+    final result = await callable.call({
+      'behaviorText': behaviorText,
+      'myBirthDate': myBirthDate,
+      'theirBirthDate': theirBirthDate,
+      if (myBirthHour != null) 'myBirthHour': myBirthHour,
+      if (theirBirthHour != null) 'theirBirthHour': theirBirthHour,
+    });
+    return RelationshipResult.fromJson(Map<String, dynamic>.from(result.data as Map));
   }
 }

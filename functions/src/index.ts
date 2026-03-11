@@ -48,6 +48,18 @@ interface TossConfirmRequest {
   amount: number;
 }
 
+interface RelationshipDiagnosisRequest {
+  behaviorText: string; // 상대방 행동 묘사 자유 텍스트
+}
+
+interface RelationshipDiagnosisSajuRequest {
+  behaviorText: string;
+  myBirthDate: string;    // YYYY-MM-DD
+  theirBirthDate: string; // YYYY-MM-DD
+  myBirthHour?: number;
+  theirBirthHour?: number;
+}
+
 // ─── 헬퍼 ───────────────────────────────────────────────────────────────────
 
 async function getUserCredits(uid: string): Promise<number> {
@@ -77,7 +89,9 @@ async function callGemini(systemPrompt: string, userPrompt: string, maxTokens = 
   });
 
   const result = await model.generateContent(userPrompt);
-  return result.response.text();
+  const text = result.response.text();
+  // JSON 파싱 전 마크다운 클렌징
+  return text.replace(/```json|```/g, "").trim();
 }
 
 // ─── 무료 분석 (호감도 점수 + 한 줄 요약) ────────────────────────────────────
@@ -97,7 +111,7 @@ export const analyzeFree = functions.onCall(
 
     const result = await callGemini(
       `당신은 연애 심리 전문가입니다. 카카오톡 대화를 분석해 상대방의 호감도를 측정합니다.
-반드시 아래 JSON 형식으로만 응답하세요:
+반드시 아래 JSON 형식으로만 응답하세요. 마크다운 없이.
 {"score": <0~100 정수>, "summary": "<20자 이내 한 줄 요약>"}`,
       `다음 카카오톡 대화를 분석해주세요:\n\n${trimmed}`
     );
@@ -124,7 +138,7 @@ export const analyzePremium = functions.onCall(
 
     const result = await callGemini(
       `당신은 연애 심리 전문가입니다. 카카오톡 대화를 심층 분석합니다.
-반드시 아래 JSON 형식으로만 응답하세요:
+반드시 아래 JSON 형식으로만 응답하세요. 마크다운 없이.
 {
   "score": <0~100 정수>,
   "summary": "<한 줄 요약>",
@@ -148,7 +162,7 @@ export const analyzePremium = functions.onCall(
   }
 );
 
-// ─── MBTI 궁합 (풍부한 콘텐츠, 캐싱 적용) ───────────────────────────────────
+// ─── MBTI 궁합 무료 (레이더 차트 포함) ───────────────────────────────────────
 
 export const analyzeMbti = functions.onCall(
   { region: "asia-northeast3", memory: "256MiB", timeoutSeconds: 45 },
@@ -173,18 +187,25 @@ export const analyzeMbti = functions.onCall(
 두 MBTI 유형의 연애 궁합을 팩폭 스타일로 깊이 있게 분석합니다.
 답변은 재미있고 공감되며 인스타/틱톡에서 스크린샷으로 공유하고 싶게 만들어야 합니다.
 
-반드시 아래 JSON 형식으로만 응답하세요. 각 항목을 최대한 풍부하고 구체적으로 작성하세요:
+반드시 아래 JSON 형식으로만 응답하세요. 마크다운 없이. 각 항목을 최대한 풍부하고 구체적으로 작성하세요:
 {
   "compatibilityScore": <0~100 정수>,
   "compatibilityTag": "<천생연분|찰떡궁합|좋은 한 쌍|특이한 조합|극과 극|도전적 관계|위험한 매력|주의 요망 중 하나>",
-  "shockLine": "<충격적이고 웃기고 공감되는 팩폭 한 줄. 캡처해서 친구들에게 보내고 싶게. 이모지 포함. 20~35자>",
+  "shockLine": "<충격적이고 웃기고 공감되는 팩폭 한 줄. 이모지 포함. 20~35자>",
   "summary": "<이 두 유형이 만나면 어떤 커플이 되는지 생생하게 2~3문장. 구체적 상황 예시 포함>",
-  "heartPounds": ["<이 커플만의 심쿵 포인트 1. 구체적 상황>", "<심쿵 포인트 2>", "<심쿵 포인트 3>"],
-  "dangerZones": ["<이 커플의 최대 갈등 패턴 1. 실제 대화 예시 포함>", "<갈등 패턴 2>"],
-  "talkTips": ["<이 조합에서 효과적인 대화법 1. 구체적>", "<대화법 2>"],
+  "heartPounds": ["<이 커플만의 심쿵 포인트 1>", "<심쿵 포인트 2>", "<심쿵 포인트 3>"],
+  "dangerZones": ["<이 커플의 최대 갈등 패턴 1. 실제 대화 예시>", "<갈등 패턴 2>"],
+  "talkTips": ["<이 조합에서 효과적인 대화법 1>", "<대화법 2>"],
   "lovePrediction": "<이 두 유형이 사귀면 어떻게 발전하는지. 3개월/6개월/1년 후 예측. 2~3문장>",
-  "myPersonality": "<${myMbti} 유형의 연애 특성. 장점/단점/버릇 포함. 2~3문장. 읽으면 '맞아 이게 나야' 하게>",
-  "theirPersonality": "<${theirMbti} 유형의 연애 특성. 장점/단점/버릇 포함. 2~3문장>"
+  "myPersonality": "<${myMbti} 유형의 연애 특성. 장점/단점/버릇 포함. 2~3문장>",
+  "theirPersonality": "<${theirMbti} 유형의 연애 특성. 장점/단점/버릇 포함. 2~3문장>",
+  "radarData": {
+    "communication": <소통력 0~100>,
+    "excitement": <설렘지수 0~100>,
+    "stability": <안정감 0~100>,
+    "growth": <성장가능성 0~100>,
+    "crisis": <위기관리 0~100>
+  }
 }`,
       `${myMbti}와 ${theirMbti}의 연애 궁합을 팩폭 스타일로 분석해주세요.
 ${myMbti}가 나이고 ${theirMbti}가 상대방입니다.`,
@@ -200,7 +221,7 @@ ${myMbti}가 나이고 ${theirMbti}가 상대방입니다.`,
   }
 );
 
-// ─── MBTI + 사주 합산 궁합 (실제 역술 기반, 크레딧 1개 차감) ────────────────
+// ─── MBTI + 사주 2단계 (오행 궁합 · 전생 스토리 · 최고/위기의 달 · 천생연분 점수) ──
 
 export const analyzeMbtiSaju = functions.onCall(
   { region: "asia-northeast3", memory: "512MiB", timeoutSeconds: 60 },
@@ -224,29 +245,40 @@ export const analyzeMbtiSaju = functions.onCall(
 사주팔자(四柱八字)를 실제로 계산하고 오행(木火土金水) 상생상극, 십이지 궁합, 천간 조화를 분석합니다.
 분석은 재미있고 팩폭 스타일로, SNS에서 바이럴될 만한 내용으로 작성합니다.
 
-반드시 아래 JSON 형식으로만 응답하세요:
+반드시 아래 JSON 형식으로만 응답하세요. 마크다운 없이.
 {
   "compatibilityScore": <MBTI+사주 종합 궁합 0~100>,
+  "destinyScore": <천생연분 점수 0~100. 전생 인연과 사주 오행 기반으로 산출>,
   "compatibilityTag": "<천생연분|찰떡궁합|좋은 한 쌍|특이한 조합|극과 극|도전적 관계|위험한 매력|주의 요망 중 하나>",
-  "shockLine": "<MBTI와 사주를 결합한 충격적이고 재미있는 팩폭 한 줄. SNS 공유 유도. 이모지 포함. 20~35자>",
+  "shockLine": "<MBTI와 사주를 결합한 충격적이고 재미있는 팩폭 한 줄. 이모지 포함. 20~35자>",
   "summary": "<MBTI 궁합 분석 2~3문장. 구체적 상황 예시 포함>",
-  "heartPounds": ["<이 커플만의 심쿵 포인트 1>", "<심쿵 포인트 2>", "<심쿵 포인트 3>"],
-  "dangerZones": ["<갈등 패턴 1. 실제 대화 예시 포함>", "<갈등 패턴 2>"],
+  "heartPounds": ["<심쿵 포인트 1>", "<심쿵 포인트 2>", "<심쿵 포인트 3>"],
+  "dangerZones": ["<갈등 패턴 1. 실제 대화 예시>", "<갈등 패턴 2>"],
   "talkTips": ["<대화법 1>", "<대화법 2>"],
   "lovePrediction": "<사주 기반 연애 발전 예측. 시간대별 흐름. 2~3문장>",
   "myPersonality": "<나의 MBTI 연애 특성 2~3문장>",
   "theirPersonality": "<상대방 MBTI 연애 특성 2~3문장>",
-  "sajuAnalysis": "<사주팔자 실제 계산 결과 (년주/월주/일주/시주 간지 포함) + 오행 궁합 분석 3~4문장>",
-  "myPillar": "<나의 사주 핵심: 일주(日柱) + 오행 특성 한 줄>",
-  "theirPillar": "<상대방 사주 핵심: 일주(日柱) + 오행 특성 한 줄>",
-  "overallVerdict": "<종합 판정: 천생연분/좋은궁합/보통/극과극/주의필요 중 하나 + 이유 한 줄>"
+  "radarData": {
+    "communication": <소통력 0~100>,
+    "excitement": <설렘지수 0~100>,
+    "stability": <안정감 0~100>,
+    "growth": <성장가능성 0~100>,
+    "crisis": <위기관리 0~100>
+  },
+  "sajuAnalysis": "<오행 상생상극 분석. 두 사람의 오행 조화와 충돌. 실제 간지(干支) 포함. 3~4문장>",
+  "myPillar": "<나의 일주(日柱) + 오행 특성 한 줄>",
+  "theirPillar": "<상대방 일주(日柱) + 오행 특성 한 줄>",
+  "overallVerdict": "<종합 판정 + 이유 한 줄>",
+  "pastLifeStory": "<두 사람의 전생 인연 스토리. 재미있고 감성적으로. 3~4문장. 전생에서 어떤 관계였는지>",
+  "bestMonth": "<이 커플의 최고의 달. 월 이름과 그 달에 좋은 이유. 예: '3월 - 서로의 감정이 폭발하는 시기. 고백 or 결혼 최적'>",
+  "crisisMonth": "<이 커플의 위기의 달. 월 이름과 주의할 점. 예: '8월 - 오행 충돌로 갈등 최고조. 여행은 피할 것'>"
 }`,
       `나: ${myMbti}, 생년월일 ${myBirthDate}, ${myHourStr}
 상대방: ${theirMbti}, 생년월일 ${theirBirthDate}, ${theirHourStr}
 
 위 두 사람의 MBTI와 사주팔자를 계산하고 종합 궁합을 분석해주세요.
 사주는 만세력 기준으로 실제 간지(干支)를 계산하여 포함하세요.`,
-      3000
+      3500
     );
 
     const parsed = JSON.parse(result);
@@ -283,7 +315,7 @@ export const analyzeSaju = functions.onCall(
 분석은 친근하고 재미있게, 하지만 전문적인 근거를 바탕으로 작성합니다.
 SNS에서 공유하고 싶을 만큼 인상적인 내용으로 작성합니다.
 
-반드시 아래 JSON 형식으로만 응답하세요:
+반드시 아래 JSON 형식으로만 응답하세요. 마크다운 없이.
 {
   "fourPillars": {
     "year": "<년주 간지 (예: 甲子)>",
@@ -298,10 +330,10 @@ SNS에서 공유하고 싶을 만큼 인상적인 내용으로 작성합니다.
     "description": "<오행 구성 특성 2문장>"
   },
   "daymaster": "<일간의 특성과 연애 스타일 2~3문장>",
-  "lovePersonality": "<연애할 때 이 사람의 특징. 장점/단점/버릇. 3~4문장. '당신은~'으로 시작. 읽으면 '맞아 이게 나야' 하게>",
-  "idealPartner": "<사주 기반 이상적인 파트너 오행/유형. 구체적으로 어떤 사람인지. 2~3문장>",
+  "lovePersonality": "<연애할 때 이 사람의 특징. 장점/단점/버릇. 3~4문장. '당신은~'으로 시작>",
+  "idealPartner": "<사주 기반 이상적인 파트너 오행/유형. 구체적으로. 2~3문장>",
   "loveIn2025": "<2025년 연애운. 언제 좋은 시기인지, 주의해야 할 시기. 2~3문장>",
-  "shockLine": "<이 사람의 연애 사주를 한 줄로 팩폭. 이모지 포함. 공유하고 싶게. 20~30자>",
+  "shockLine": "<이 사람의 연애 사주를 한 줄로 팩폭. 이모지 포함. 20~30자>",
   "advice": "<현재 연애 상황에 대한 조언. 구체적 행동 제안. 2~3문장>"
 }`,
       `생년월일: ${birthDate}, ${hourStr}, 성별: ${gender}${questionStr}
@@ -312,6 +344,94 @@ SNS에서 공유하고 싶을 만큼 인상적인 내용으로 작성합니다.
     );
 
     return JSON.parse(result);
+  }
+);
+
+// ─── 이 사람, 진심일까? 무료 진단 ──────────────────────────────────────────
+
+export const analyzeRelationship = functions.onCall(
+  { region: "asia-northeast3", memory: "256MiB", timeoutSeconds: 30 },
+  async (request) => {
+    if (!request.auth) throw new functions.HttpsError("unauthenticated", "로그인이 필요합니다");
+
+    const { behaviorText } = request.data as RelationshipDiagnosisRequest;
+    if (!behaviorText || behaviorText.length < 10) {
+      throw new functions.HttpsError("invalid-argument", "내용이 너무 짧습니다");
+    }
+
+    const result = await callGemini(
+      `당신은 연애 심리 전문가입니다. 상대방의 행동 묘사를 듣고 진심 여부를 판단합니다.
+재미있고 공감되면서도 정확한 분석을 합니다.
+반드시 아래 JSON 형식으로만 응답하세요. 마크다운 없이.
+{
+  "temperature": <관계 온도 0~100. 100이 불타는 진심, 0이 완전 관심없음>,
+  "sincerity": "<진심|애매|관심없음 중 하나>",
+  "sincerityReason": "<진심 판정 이유. 구체적 행동 근거 포함. 2~3문장>",
+  "positiveSignals": ["<긍정적 신호 1>", "<긍정적 신호 2>", "<긍정적 신호 3>"],
+  "warningSignals": ["<주의 신호 1>", "<주의 신호 2>"],
+  "shockLine": "<이 관계를 한 줄로 팩폭. 이모지 포함. 15~25자>"
+}`,
+      `상대방 행동 묘사:\n\n${behaviorText}`
+    );
+
+    return JSON.parse(result);
+  }
+);
+
+// ─── 이 사람, 진심일까? 사주 심층 분석 (크레딧 1개 차감) ───────────────────
+
+export const analyzeRelationshipSaju = functions.onCall(
+  { region: "asia-northeast3", memory: "512MiB", timeoutSeconds: 60 },
+  async (request) => {
+    if (!request.auth) throw new functions.HttpsError("unauthenticated", "로그인이 필요합니다");
+    const uid = request.auth.uid;
+
+    const credits = await getUserCredits(uid);
+    if (credits <= 0) throw new functions.HttpsError("resource-exhausted", "크레딧이 부족합니다");
+    await deductCredit(uid);
+
+    const { behaviorText, myBirthDate, theirBirthDate, myBirthHour, theirBirthHour } =
+      request.data as RelationshipDiagnosisSajuRequest;
+
+    const myHourStr = myBirthHour !== undefined ? `${myBirthHour}시` : "시간 미입력";
+    const theirHourStr = theirBirthHour !== undefined ? `${theirBirthHour}시` : "시간 미입력";
+
+    const result = await callGemini(
+      `당신은 동양 사주명리학 전문가이자 연애 심리 상담사입니다.
+두 사람의 생년월일 사주와 관계 상황을 종합 분석합니다.
+반드시 아래 JSON 형식으로만 응답하세요. 마크다운 없이.
+{
+  "temperature": <관계 온도 0~100>,
+  "sincerity": "<진심|애매|관심없음 중 하나>",
+  "sincerityReason": "<행동 + 사주 기반 판정 이유. 3~4문장>",
+  "positiveSignals": ["<긍정 신호 1>", "<긍정 신호 2>", "<긍정 신호 3>"],
+  "warningSignals": ["<주의 신호 1>", "<주의 신호 2>"],
+  "shockLine": "<이 관계 팩폭 한 줄. 이모지 포함. 15~25자>",
+  "relationshipType": "<귀인|악연|인연|시험|스침 중 하나>",
+  "relationshipTypeReason": "<귀인/악연/인연 판정 이유. 사주 근거. 2~3문장>",
+  "futureFlow": "<3개월/6개월/1년 후 이 관계의 흐름 예측. 구체적 시기 포함. 3~4문장>",
+  "bestTiming": "<이 관계에서 행동하기 최적의 시기. 구체적 월/계절 포함>",
+  "finalVerdict": "<최종 판정: 밀어붙여라|신중하게|잠시 기다려라|손절해라 중 하나 + 이유 2문장>",
+  "adviceForUser": "<구체적 행동 조언. 다음에 할 말/행동 포함. 2~3문장>"
+}`,
+      `나: 생년월일 ${myBirthDate}, ${myHourStr}
+상대방: 생년월일 ${theirBirthDate}, ${theirHourStr}
+
+상대방 행동 묘사: ${behaviorText}
+
+위 두 사람의 사주를 계산하고 이 관계를 종합 진단해주세요.`,
+      3000
+    );
+
+    const parsed = JSON.parse(result);
+
+    await db.collection("users").doc(uid).collection("analyses").add({
+      type: "relationshipSaju",
+      ...parsed,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return parsed;
   }
 );
 
@@ -388,6 +508,7 @@ export const revenuecatWebhook = functions.onRequest(
       credit_1: 1,
       credit_5: 5,
       credit_10: 10,
+      saju_analysis_990: 1,
     };
 
     const credits = creditMap[productId];
