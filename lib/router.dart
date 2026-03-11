@@ -8,7 +8,7 @@ import 'screens/settings_screen.dart';
 import 'screens/kakao_analysis_screen.dart';
 import 'screens/mbti_screen.dart';
 import 'screens/saju_screen.dart';
-import 'screens/breakup_calculator_screen.dart';
+import 'screens/relationship_diagnosis_screen.dart';
 import 'screens/paywall_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/privacy_policy_screen.dart';
@@ -48,7 +48,7 @@ final appRouter = GoRouter(
               GoRoute(path: 'kakao', builder: (_, __) => const KakaoAnalysisScreen()),
               GoRoute(path: 'mbti', builder: (_, __) => const MbtiScreen()),
               GoRoute(path: 'saju', builder: (_, __) => const SajuScreen()),
-              GoRoute(path: 'breakup', builder: (_, __) => const BreakupCalculatorScreen()),
+              GoRoute(path: 'diagnosis', builder: (_, __) => const RelationshipDiagnosisScreen()),
             ],
           ),
         ]),

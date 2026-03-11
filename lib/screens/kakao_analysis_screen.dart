@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -66,19 +65,16 @@ class _KakaoNotifier extends StateNotifier<_KakaoState> {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['txt'],
-      withData: kIsWeb, // 웹에서는 bytes로 직접 읽기
+      withData: true, // bytes로 직접 읽기 (웹 필수)
     );
     if (result == null) return;
 
     final file = result.files.single;
     String? content;
 
-    if (kIsWeb && file.bytes != null) {
-      // 웹: bytes → UTF-8 문자열 변환
+    if (file.bytes != null) {
+      // bytes로 직접 읽기 (웹 필수, 모바일도 withData:true 시 사용 가능)
       content = utf8.decode(file.bytes!);
-    } else if (!kIsWeb && file.path != null) {
-      // 모바일/데스크톱: 파일 경로로 읽기
-      content = await File(file.path!).readAsString();
     }
 
     if (content != null) {

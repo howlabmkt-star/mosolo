@@ -1,7 +1,9 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../services/analysis_service.dart';
 import '../services/credit_service.dart';
 import '../models/mbti_result.dart';
@@ -506,11 +508,29 @@ class _MbtiResultCard extends StatelessWidget {
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic, height: 1.5, color: Color(0xFF4A3F8F)),
                 textAlign: TextAlign.center),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
-            // 요약
-            Text(result.summary,
-              style: const TextStyle(fontSize: 14, color: Color(0xFF444444), height: 1.7)),
+            // 5영역 레이더 차트
+            if (result.radarData != null) ...[
+              _SectionTitle(emoji: '📊', title: '5영역 궁합 분석'),
+              const SizedBox(height: 12),
+              _RadarSection(radarData: result.radarData!),
+              const SizedBox(height: 20),
+            ],
+
+            // 관계 스토리 (요약)
+            _SectionTitle(emoji: '💌', title: '관계 스토리'),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF0F5),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFF6B9D).withOpacity(0.25)),
+              ),
+              child: Text(result.summary,
+                style: const TextStyle(fontSize: 14, color: Color(0xFF444444), height: 1.7)),
+            ),
             const SizedBox(height: 22),
 
             // 심쿵 포인트
@@ -574,8 +594,17 @@ class _MbtiResultCard extends StatelessWidget {
               const SizedBox(height: 20),
             ],
 
-            // 사주 섹션
+            // 사주 2단계 전용 섹션
             if (result.isSajuMode) ...[
+              // 천생연분 점수
+              if (result.destinyScore != null) ...[
+                _SectionTitle(emoji: '⭐', title: '천생연분 점수'),
+                const SizedBox(height: 12),
+                _DestinyScoreBar(score: result.destinyScore!),
+                const SizedBox(height: 20),
+              ],
+
+              // 오행 궁합 분석
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -586,7 +615,7 @@ class _MbtiResultCard extends StatelessWidget {
                   const Row(children: [
                     Text('🀄', style: TextStyle(fontSize: 18)),
                     SizedBox(width: 6),
-                    Text('사주팔자 심층 분석', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                    Text('오행 궁합 분석', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
                   ]),
                   const SizedBox(height: 12),
                   if (result.myPillar != null) _PillarRow('나', result.myPillar!),
@@ -595,8 +624,52 @@ class _MbtiResultCard extends StatelessWidget {
                   Text(result.sajuAnalysis!, style: const TextStyle(fontSize: 13, height: 1.7, color: Color(0xFF444444))),
                 ]),
               ),
+              const SizedBox(height: 16),
+
+              // 전생 스토리
+              if (result.pastLifeStory != null) ...[
+                _SectionTitle(emoji: '🌙', title: '전생 인연 스토리'),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0E6FF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF6A0DAD).withOpacity(0.25)),
+                  ),
+                  child: Text(result.pastLifeStory!,
+                    style: const TextStyle(fontSize: 13, height: 1.8, color: Color(0xFF3D0066), fontStyle: FontStyle.italic)),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // 최고의 달 / 위기의 달
+              if (result.bestMonth != null || result.crisisMonth != null) ...[
+                _SectionTitle(emoji: '📅', title: '이 커플의 달력'),
+                const SizedBox(height: 10),
+                Row(children: [
+                  if (result.bestMonth != null)
+                    Expanded(child: _MonthCard(
+                      emoji: '🌸',
+                      title: '최고의 달',
+                      content: result.bestMonth!,
+                      color: const Color(0xFF43A047),
+                    )),
+                  if (result.bestMonth != null && result.crisisMonth != null)
+                    const SizedBox(width: 10),
+                  if (result.crisisMonth != null)
+                    Expanded(child: _MonthCard(
+                      emoji: '⚡',
+                      title: '위기의 달',
+                      content: result.crisisMonth!,
+                      color: Colors.deepOrange,
+                    )),
+                ]),
+                const SizedBox(height: 16),
+              ],
+
+              // 종합 판정
               if (result.overallVerdict != null) ...[
-                const SizedBox(height: 12),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
@@ -712,6 +785,109 @@ class _PillarRow extends StatelessWidget {
     child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       SizedBox(width: 52, child: Text('$label:', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF856404)))),
       Expanded(child: Text(value, style: const TextStyle(fontSize: 12, color: Color(0xFF555555)))),
+    ]),
+  );
+}
+
+// ── 레이더 차트 ───────────────────────────────────────────────────────────────
+
+class _RadarSection extends StatelessWidget {
+  final Map<String, double> radarData;
+  const _RadarSection({required this.radarData});
+
+  @override
+  Widget build(BuildContext context) {
+    final labels = ['소통력', '설렘지수', '안정감', '성장가능성', '위기관리'];
+    final keys   = ['communication', 'excitement', 'stability', 'growth', 'crisis'];
+    final values = keys.map((k) => (radarData[k] ?? 50.0)).toList();
+
+    return SizedBox(
+      height: 220,
+      child: Stack(alignment: Alignment.center, children: [
+        RadarChart(
+          RadarChartData(
+            dataSets: [
+              RadarDataSet(
+                dataEntries: values.map((v) => RadarEntry(value: v)).toList(),
+                fillColor: const Color(0xFF7B68EE).withOpacity(0.25),
+                borderColor: const Color(0xFF7B68EE),
+                borderWidth: 2,
+                entryRadius: 4,
+              ),
+            ],
+            radarShape: RadarShape.polygon,
+            radarBorderData: const BorderSide(color: Colors.transparent),
+            tickBorderData: BorderSide(color: Colors.grey.shade300, width: 1),
+            gridBorderData: BorderSide(color: Colors.grey.shade200, width: 1),
+            tickCount: 4,
+            ticksTextStyle: const TextStyle(fontSize: 0, color: Colors.transparent),
+            titleTextStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF555555)),
+            titlePositionPercentageOffset: 0.18,
+            getTitle: (index, angle) {
+              final val = values[index].toInt();
+              return RadarChartTitle(text: '${labels[index]}\n$val', angle: 0);
+            },
+            radarBackgroundColor: Colors.transparent,
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+// ── 천생연분 점수 바 ──────────────────────────────────────────────────────────
+
+class _DestinyScoreBar extends StatelessWidget {
+  final int score;
+  const _DestinyScoreBar({required this.score});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = score >= 80 ? const Color(0xFFFF6B9D)
+      : score >= 60 ? const Color(0xFFFF8E53) : Colors.grey;
+    final label = score >= 80 ? '전생부터 이어진 인연' : score >= 60 ? '이번 생에서 이어진 인연' : '우연히 만난 인연';
+    return Column(children: [
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Text(label, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)),
+        Text('$score점', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: color)),
+      ]),
+      const SizedBox(height: 8),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: LinearProgressIndicator(
+          value: score / 100,
+          backgroundColor: Colors.grey.shade200,
+          valueColor: AlwaysStoppedAnimation(color),
+          minHeight: 12,
+        ),
+      ),
+    ]);
+  }
+}
+
+// ── 최고/위기의 달 카드 ───────────────────────────────────────────────────────
+
+class _MonthCard extends StatelessWidget {
+  final String emoji, title, content;
+  final Color color;
+  const _MonthCard({required this.emoji, required this.title, required this.content, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.07),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: color.withOpacity(0.3)),
+    ),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Text(emoji, style: const TextStyle(fontSize: 16)),
+        const SizedBox(width: 4),
+        Text(title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color)),
+      ]),
+      const SizedBox(height: 6),
+      Text(content, style: const TextStyle(fontSize: 11, height: 1.5, color: Color(0xFF444444))),
     ]),
   );
 }
