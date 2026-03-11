@@ -99,14 +99,14 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
 
-                  // 손절 계산기
+                  // 이 사람, 진심일까?
                   FeatureCard(
-                    icon: '✂️',
-                    title: '관계 손절 계산기',
-                    subtitle: '참아야 할까? 지금 당장 차단?\n20개 항목 무료 체크',
-                    badge: '완전무료',
-                    badgeColor: const Color(0xFF2196F3),
-                    onTap: () => context.push('/breakup'),
+                    icon: '🔍',
+                    title: '이 사람, 진심일까?',
+                    subtitle: '행동으로 읽는 진심 vs 관심없음\n무료 진단 + 990원 사주 심층 분석',
+                    badge: 'NEW',
+                    badgeColor: const Color(0xFF5C6BC0),
+                    onTap: () => context.push('/diagnosis'),
                   ),
 
                   const SizedBox(height: 32),
