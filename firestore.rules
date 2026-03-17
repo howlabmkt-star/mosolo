@@ -19,5 +19,11 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
+
+    // 생년월일 궁합 캐시: 로그인한 모든 유저 읽기, 쓰기는 Cloud Functions만
+    match /compatibilityCache/{cacheId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
   }
 }

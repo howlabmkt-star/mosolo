@@ -271,7 +271,11 @@ export const analyzeMbtiSaju = functions.onCall(
   "overallVerdict": "<종합 판정 + 이유 한 줄>",
   "pastLifeStory": "<두 사람의 전생 인연 스토리. 재미있고 감성적으로. 3~4문장. 전생에서 어떤 관계였는지>",
   "bestMonth": "<이 커플의 최고의 달. 월 이름과 그 달에 좋은 이유. 예: '3월 - 서로의 감정이 폭발하는 시기. 고백 or 결혼 최적'>",
-  "crisisMonth": "<이 커플의 위기의 달. 월 이름과 주의할 점. 예: '8월 - 오행 충돌로 갈등 최고조. 여행은 피할 것'>"
+  "crisisMonth": "<이 커플의 위기의 달. 월 이름과 주의할 점. 예: '8월 - 오행 충돌로 갈등 최고조. 여행은 피할 것'>",
+  "recommendedSkinshipStage": <이 커플에게 지금 적합한 스킨십 단계 1~7. MBTI+사주 종합 판단>,
+  "skinshipAdvice": "<스킨십 단계 추천 이유와 구체적 방법. 2~3문장. 실제 상황 예시 포함>",
+  "datingCourse": ["<MBTI+사주 맞춤 데이트 코스 1. 구체적 장소/활동>", "<데이트 코스 2>", "<데이트 코스 3>"],
+  "conflictResolution": "<이 커플의 갈등 패턴과 해결법. MBTI 특성 + 오행 충돌 기반. 구체적 대화 예시 포함. 2~3문장>"
 }`,
       `나: ${myMbti}, 생년월일 ${myBirthDate}, ${myHourStr}
 상대방: ${theirMbti}, 생년월일 ${theirBirthDate}, ${theirHourStr}
@@ -431,6 +435,203 @@ export const analyzeRelationshipSaju = functions.onCall(
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    return parsed;
+  }
+);
+
+// ─── 생년월일 궁합 무료 분석 ──────────────────────────────────────────────────
+
+interface CompatibilityRequest {
+  myBirthDate: string;    // YYYY-MM-DD
+  theirBirthDate: string; // YYYY-MM-DD
+  myBirthHour?: number;
+  theirBirthHour?: number;
+}
+
+export const analyzeCompatibility = functions.onCall(
+  { region: "asia-northeast3", memory: "256MiB", timeoutSeconds: 45 },
+  async (request) => {
+    if (!request.auth) throw new functions.HttpsError("unauthenticated", "로그인이 필요합니다");
+
+    const { myBirthDate, theirBirthDate, myBirthHour, theirBirthHour } =
+      request.data as CompatibilityRequest;
+
+    if (!myBirthDate || !theirBirthDate) {
+      throw new functions.HttpsError("invalid-argument", "생년월일이 필요합니다");
+    }
+
+    const myHourStr = myBirthHour !== undefined ? `출생시간 ${myBirthHour}시` : "출생시간 미입력";
+    const theirHourStr = theirBirthHour !== undefined ? `출생시간 ${theirBirthHour}시` : "출생시간 미입력";
+
+    // 캐시 키
+    const cacheKey = [myBirthDate, theirBirthDate].sort().join("_");
+    const cacheRef = db.collection("compatibilityCache").doc(cacheKey);
+    const cached = await cacheRef.get();
+    if (cached.exists) return cached.data();
+
+    const result = await callGemini(
+      `당신은 동양 사주명리학 전문가이자 연애 궁합 전문가입니다.
+두 사람의 생년월일로 사주팔자를 계산하고 오행 궁합을 분석합니다.
+분석은 재미있고 공감되며 SNS에서 공유하고 싶게 만들어야 합니다.
+반드시 아래 JSON 형식으로만 응답하세요. 마크다운 없이.
+{
+  "compatibilityScore": <0~100 정수. 오행 상생상극 기반>,
+  "temperatureLabel": "<불타는 인연|따뜻한 인연|미지근한 인연|차가운 인연 중 하나>",
+  "compatibilityTag": "<천생연분|찰떡궁합|좋은 인연|평범한 인연|도전적 인연|위험한 인연 중 하나>",
+  "shockLine": "<오행 궁합을 팩폭으로 한 줄. 이모지 포함. 20~35자>",
+  "summary": "<두 사람의 오행 조화와 궁합 특성. 생생한 상황 예시 포함. 2~3문장>",
+  "myElementDesc": "<나의 일주(日柱) 오행 특성과 연애 스타일. 1~2문장>",
+  "theirElementDesc": "<상대방 일주(日柱) 오행 특성과 연애 스타일. 1~2문장>"
+}`,
+      `나: 생년월일 ${myBirthDate}, ${myHourStr}
+상대방: 생년월일 ${theirBirthDate}, ${theirHourStr}
+위 두 사람의 사주팔자를 만세력 기준으로 계산하고 오행 궁합을 분석해주세요.`,
+      2000
+    );
+
+    const parsed = JSON.parse(result);
+    await cacheRef.set({ ...parsed, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+    return parsed;
+  }
+);
+
+// ─── 생년월일 궁합 유료 분석 (스킨십 단계 + 연애 조언, 크레딧 1개) ─────────
+
+export const analyzeCompatibilityPremium = functions.onCall(
+  { region: "asia-northeast3", memory: "512MiB", timeoutSeconds: 60 },
+  async (request) => {
+    if (!request.auth) throw new functions.HttpsError("unauthenticated", "로그인이 필요합니다");
+    const uid = request.auth.uid;
+
+    const credits = await getUserCredits(uid);
+    if (credits <= 0) throw new functions.HttpsError("resource-exhausted", "크레딧이 부족합니다");
+    await deductCredit(uid);
+
+    const { myBirthDate, theirBirthDate, myBirthHour, theirBirthHour } =
+      request.data as CompatibilityRequest;
+
+    const myHourStr = myBirthHour !== undefined ? `출생시간 ${myBirthHour}시` : "출생시간 미입력";
+    const theirHourStr = theirBirthHour !== undefined ? `출생시간 ${theirBirthHour}시` : "출생시간 미입력";
+
+    const result = await callGemini(
+      `당신은 동양 사주명리학 전문가이자 연애 코치입니다.
+두 사람의 생년월일 사주를 기반으로 궁합과 연애 조언을 제공합니다.
+분석은 구체적이고 실용적이며, 재미있고 혹할 만한 내용으로 작성합니다.
+스킨십 단계는 한국 연애 문화에 맞게 7단계로 구성합니다.
+반드시 아래 JSON 형식으로만 응답하세요. 마크다운 없이.
+{
+  "compatibilityScore": <0~100 정수>,
+  "temperatureLabel": "<불타는 인연|따뜻한 인연|미지근한 인연|차가운 인연 중 하나>",
+  "compatibilityTag": "<천생연분|찰떡궁합|좋은 인연|평범한 인연|도전적 인연|위험한 인연 중 하나>",
+  "shockLine": "<팩폭 한 줄. 이모지 포함. 20~35자>",
+  "summary": "<오행 궁합 종합 분석. 2~3문장>",
+  "myElementDesc": "<나의 연애 오행 특성. 1~2문장>",
+  "theirElementDesc": "<상대방 연애 오행 특성. 1~2문장>",
+  "coupleChemistry": "<이 두 사람의 케미 분석. 실제 커플 사례 느낌으로. 3~4문장>",
+  "skinshipStages": [
+    {"emoji": "👀", "title": "눈 맞춤 & 미소", "description": "자연스러운 시선 교환으로 관심 표현", "timing": "<적절한 시기>", "tip": "<구체적 팁>"},
+    {"emoji": "🤝", "title": "가벼운 신체 접촉", "description": "팔 스치기, 어깨 터치 등", "timing": "<적절한 시기>", "tip": "<구체적 팁>"},
+    {"emoji": "🤲", "title": "손잡기", "description": "자연스러운 상황에서 손을 잡기", "timing": "<적절한 시기>", "tip": "<구체적 팁>"},
+    {"emoji": "💪", "title": "팔짱 & 어깨 동무", "description": "친밀감을 높이는 팔짱 끼기", "timing": "<적절한 시기>", "tip": "<구체적 팁>"},
+    {"emoji": "🤗", "title": "포옹", "description": "감정적 유대를 깊게 하는 포옹", "timing": "<적절한 시기>", "tip": "<구체적 팁>"},
+    {"emoji": "😘", "title": "볼 뽀뽀 & 이마 키스", "description": "애정 표현의 시작", "timing": "<적절한 시기>", "tip": "<구체적 팁>"},
+    {"emoji": "💋", "title": "첫 키스", "description": "관계의 전환점", "timing": "<적절한 시기>", "tip": "<구체적 팁>"}
+  ],
+  "recommendedStageIndex": <지금 이 커플에게 적합한 단계 인덱스 0~6. 오행 궁합 기반>,
+  "datingAdvice": ["<연애 조언 1. 구체적 행동 포함>", "<연애 조언 2>", "<연애 조언 3>"],
+  "thisMonthFortune": "<이달의 연애 운세. 사주 기반. 구체적 행동 제안 포함. 2~3문장>",
+  "bestDateIdea": "<이 두 사람에게 맞는 최고의 데이트 코스. 오행 특성 기반. 2~3문장>",
+  "conflictResolution": "<이 커플의 갈등 패턴과 해결법. 오행 상극 기반. 2~3문장>"
+}`,
+      `나: 생년월일 ${myBirthDate}, ${myHourStr}
+상대방: 생년월일 ${theirBirthDate}, ${theirHourStr}
+위 두 사람의 사주팔자를 만세력 기준으로 계산하고 상세 궁합과 스킨십 단계를 분석해주세요.`,
+      4000
+    );
+
+    const parsed = JSON.parse(result);
+    await db.collection("users").doc(uid).collection("analyses").add({
+      type: "compatibilityPremium",
+      myBirthDate, theirBirthDate,
+      ...parsed,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return parsed;
+  }
+);
+
+// ─── 종합 연애 리포트 (MBTI + 생년월일 + 카카오 믹스, 크레딧 2개) ─────────────
+
+interface MixAnalysisRequest {
+  myMbti: string;
+  theirMbti: string;
+  myBirthDate: string;
+  theirBirthDate: string;
+  myBirthHour?: number;
+  theirBirthHour?: number;
+  chatContent?: string; // 선택 (카카오 분석 포함 시)
+}
+
+export const analyzeMix = functions.onCall(
+  { region: "asia-northeast3", memory: "512MiB", timeoutSeconds: 90 },
+  async (request) => {
+    if (!request.auth) throw new functions.HttpsError("unauthenticated", "로그인이 필요합니다");
+    const uid = request.auth.uid;
+
+    const credits = await getUserCredits(uid);
+    const requiredCredits = 2;
+    if (credits < requiredCredits) throw new functions.HttpsError("resource-exhausted", "크레딧이 부족합니다 (2개 필요)");
+
+    // 2크레딧 차감 (트랜잭션)
+    const ref = db.collection("users").doc(uid);
+    await db.runTransaction(async (tx) => {
+      const doc = await tx.get(ref);
+      const c = (doc.data()?.credits ?? 0) as number;
+      if (c < requiredCredits) throw new Error("크레딧이 부족합니다");
+      tx.update(ref, { credits: c - requiredCredits });
+    });
+
+    const { myMbti, theirMbti, myBirthDate, theirBirthDate, myBirthHour, theirBirthHour, chatContent } =
+      request.data as MixAnalysisRequest;
+
+    const myHourStr = myBirthHour !== undefined ? `${myBirthHour}시` : "미입력";
+    const theirHourStr = theirBirthHour !== undefined ? `${theirBirthHour}시` : "미입력";
+    const chatSection = chatContent ? `\n카카오톡 대화 일부:\n${chatContent.split("\n").slice(-100).join("\n")}` : "";
+
+    const result = await callGemini(
+      `당신은 MBTI 심리학, 동양 사주명리학, 카카오톡 대화 분석을 종합하는 최고의 연애 전문가입니다.
+세 가지 분석을 융합하여 이 커플만을 위한 맞춤 연애 리포트를 작성합니다.
+분석은 매우 구체적이고 실용적이며, 읽는 사람이 놀랄 만큼 정확하게 느껴져야 합니다.
+반드시 아래 JSON 형식으로만 응답하세요. 마크다운 없이.
+{
+  "overallScore": <종합 연애 점수 0~100>,
+  "overallTag": "<이 커플을 한 마디로 설명하는 태그. 예: 운명의 장난|천생연분|위험한 매력|조용한 폭풍>",
+  "shockLine": "<이 커플의 관계를 한 줄 팩폭. 이모지 포함. 20~35자>",
+  "mbtiSynergy": "<MBTI 궁합 분석. 어떤 시너지가 있는지. 2~3문장>",
+  "sajuSynergy": "<사주 오행 궁합 분석. 어떤 오행이 충돌/조화하는지. 2~3문장>",
+  "chatInsight": "<카카오 대화에서 보이는 두 사람의 감정 흐름. 카카오 없으면 MBTI/사주 기반 예측. 2~3문장>",
+  "strengthPoints": ["<이 커플의 강점 1>", "<강점 2>", "<강점 3>"],
+  "weakPoints": ["<이 커플의 약점/위험 요소 1>", "<약점 2>"],
+  "skinshipRecommendation": "<지금 이 커플의 적절한 스킨십 단계와 이유. 구체적으로. 2~3문장>",
+  "recommendedSkinshipStage": <1~7 추천 스킨십 단계>,
+  "monthlyFortune": "<이달 이 커플의 운세. 사주 기반. 구체적 조언 포함. 2~3문장>",
+  "actionPlan": ["<지금 당장 해야 할 행동 1>", "<행동 2>", "<행동 3>"],
+  "futureVision": "<3개월/6개월/1년 후 이 커플의 모습 예측. 밝은 전망과 주의사항 포함. 3~4문장>",
+  "secretWeapon": "<이 커플만의 무기. 잘 살리면 최고의 커플이 되는 특별한 점. 2문장>"
+}`,
+      `나: MBTI ${myMbti}, 생년월일 ${myBirthDate}, 출생시간 ${myHourStr}
+상대방: MBTI ${theirMbti}, 생년월일 ${theirBirthDate}, 출생시간 ${theirHourStr}${chatSection}
+위 정보를 종합하여 이 커플의 맞춤 연애 리포트를 작성해주세요.`,
+      4500
+    );
+
+    const parsed = JSON.parse(result);
+    await db.collection("users").doc(uid).collection("analyses").add({
+      type: "mix",
+      myMbti, theirMbti, myBirthDate, theirBirthDate,
+      ...parsed,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
     return parsed;
   }
 );

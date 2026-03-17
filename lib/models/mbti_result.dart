@@ -25,6 +25,12 @@ class MbtiResult {
   final String? bestMonth;     // 최고의 달
   final String? crisisMonth;   // 위기의 달
 
+  // 스킨십 단계 (사주 유료 전용)
+  final int? recommendedSkinshipStage;   // 1~7 추천 단계
+  final String? skinshipAdvice;          // 스킨십 조언
+  final List<String>? datingCourse;     // MBTI 맞춤 데이트 코스
+  final String? conflictResolution;     // 갈등 해결법
+
   const MbtiResult({
     required this.myMbti,
     required this.theirMbti,
@@ -47,6 +53,10 @@ class MbtiResult {
     this.pastLifeStory,
     this.bestMonth,
     this.crisisMonth,
+    this.recommendedSkinshipStage,
+    this.skinshipAdvice,
+    this.datingCourse,
+    this.conflictResolution,
   });
 
   bool get isSajuMode => sajuAnalysis != null;
@@ -73,6 +83,10 @@ class MbtiResult {
     pastLifeStory: json['pastLifeStory'] as String?,
     bestMonth: json['bestMonth'] as String?,
     crisisMonth: json['crisisMonth'] as String?,
+    recommendedSkinshipStage: (json['recommendedSkinshipStage'] as num?)?.toInt(),
+    skinshipAdvice: json['skinshipAdvice'] as String?,
+    datingCourse: _toStringList(json['datingCourse']),
+    conflictResolution: json['conflictResolution'] as String?,
   );
 
   static List<String> _toStringList(dynamic value) {

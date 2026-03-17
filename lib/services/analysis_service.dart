@@ -4,6 +4,7 @@ import '../models/analysis_result.dart';
 import '../models/mbti_result.dart';
 import '../models/saju_result.dart';
 import '../models/relationship_result.dart';
+import '../models/compatibility_result.dart';
 
 final analysisServiceProvider = Provider<AnalysisService>((ref) => AnalysisService());
 
@@ -84,6 +85,69 @@ class AnalysisService {
     );
     final result = await callable.call({'behaviorText': behaviorText});
     return RelationshipResult.fromJson(Map<String, dynamic>.from(result.data as Map));
+  }
+
+  Future<CompatibilityResult> analyzeCompatibility({
+    required String myBirthDate,
+    required String theirBirthDate,
+    int? myBirthHour,
+    int? theirBirthHour,
+  }) async {
+    final callable = _functions.httpsCallable(
+      'analyzeCompatibility',
+      options: HttpsCallableOptions(timeout: const Duration(seconds: 45)),
+    );
+    final result = await callable.call({
+      'myBirthDate': myBirthDate,
+      'theirBirthDate': theirBirthDate,
+      if (myBirthHour != null) 'myBirthHour': myBirthHour,
+      if (theirBirthHour != null) 'theirBirthHour': theirBirthHour,
+    });
+    return CompatibilityResult.fromJson(Map<String, dynamic>.from(result.data as Map));
+  }
+
+  Future<CompatibilityResult> analyzeCompatibilityPremium({
+    required String myBirthDate,
+    required String theirBirthDate,
+    int? myBirthHour,
+    int? theirBirthHour,
+  }) async {
+    final callable = _functions.httpsCallable(
+      'analyzeCompatibilityPremium',
+      options: HttpsCallableOptions(timeout: const Duration(seconds: 60)),
+    );
+    final result = await callable.call({
+      'myBirthDate': myBirthDate,
+      'theirBirthDate': theirBirthDate,
+      if (myBirthHour != null) 'myBirthHour': myBirthHour,
+      if (theirBirthHour != null) 'theirBirthHour': theirBirthHour,
+    });
+    return CompatibilityResult.fromJson(Map<String, dynamic>.from(result.data as Map));
+  }
+
+  Future<Map<String, dynamic>> analyzeMix({
+    required String myMbti,
+    required String theirMbti,
+    required String myBirthDate,
+    required String theirBirthDate,
+    int? myBirthHour,
+    int? theirBirthHour,
+    String? chatContent,
+  }) async {
+    final callable = _functions.httpsCallable(
+      'analyzeMix',
+      options: HttpsCallableOptions(timeout: const Duration(seconds: 90)),
+    );
+    final result = await callable.call({
+      'myMbti': myMbti,
+      'theirMbti': theirMbti,
+      'myBirthDate': myBirthDate,
+      'theirBirthDate': theirBirthDate,
+      if (myBirthHour != null) 'myBirthHour': myBirthHour,
+      if (theirBirthHour != null) 'theirBirthHour': theirBirthHour,
+      if (chatContent != null) 'chatContent': chatContent,
+    });
+    return Map<String, dynamic>.from(result.data as Map);
   }
 
   Future<RelationshipResult> analyzeRelationshipSaju({

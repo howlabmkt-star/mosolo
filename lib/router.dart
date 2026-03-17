@@ -9,16 +9,12 @@ import 'screens/kakao_analysis_screen.dart';
 import 'screens/mbti_screen.dart';
 import 'screens/saju_screen.dart';
 import 'screens/relationship_diagnosis_screen.dart';
+import 'screens/compatibility_screen.dart';
+import 'screens/mix_screen.dart';
 import 'screens/paywall_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/privacy_policy_screen.dart';
 import 'screens/payment_result_screen.dart';
-
-Future<String> _initialLocation() async {
-  final prefs = await SharedPreferences.getInstance();
-  final done = prefs.getBool('onboarding_done') ?? false;
-  return done ? '/' : '/onboarding';
-}
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -40,6 +36,7 @@ final appRouter = GoRouter(
     StatefulShellRoute.indexedStack(
       builder: (context, state, shell) => MainShell(navigationShell: shell),
       branches: [
+        // 홈 탭
         StatefulShellBranch(routes: [
           GoRoute(
             path: '/',
@@ -49,12 +46,16 @@ final appRouter = GoRouter(
               GoRoute(path: 'mbti', builder: (_, __) => const MbtiScreen()),
               GoRoute(path: 'saju', builder: (_, __) => const SajuScreen()),
               GoRoute(path: 'diagnosis', builder: (_, __) => const RelationshipDiagnosisScreen()),
+              GoRoute(path: 'compatibility', builder: (_, __) => const CompatibilityScreen()),
+              GoRoute(path: 'mix', builder: (_, __) => const MixScreen()),
             ],
           ),
         ]),
+        // 기록 탭
         StatefulShellBranch(routes: [
           GoRoute(path: '/history', builder: (_, __) => const HistoryScreen()),
         ]),
+        // 설정 탭
         StatefulShellBranch(routes: [
           GoRoute(
             path: '/settings',

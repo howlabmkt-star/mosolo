@@ -594,6 +594,59 @@ class _MbtiResultCard extends StatelessWidget {
               const SizedBox(height: 20),
             ],
 
+            // ── 스킨십 단계 추천 (사주 유료 전용) ─────────────────────────
+            if (result.isSajuMode && result.recommendedSkinshipStage != null) ...[
+              _SectionTitle(emoji: '💑', title: '스킨십 단계 가이드'),
+              const SizedBox(height: 12),
+              _SkinshipGuide(
+                recommendedStage: result.recommendedSkinshipStage!,
+                advice: result.skinshipAdvice ?? '',
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // ── MBTI 데이트 코스 (사주 유료 전용) ────────────────────────
+            if (result.isSajuMode && result.datingCourse != null && result.datingCourse!.isNotEmpty) ...[
+              _SectionTitle(emoji: '🗺️', title: 'MBTI 맞춤 데이트 코스'),
+              const SizedBox(height: 10),
+              ...result.datingCourse!.asMap().entries.map((e) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F0FF),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF7B68EE).withOpacity(0.25)),
+                ),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Container(
+                    width: 24, height: 24,
+                    decoration: const BoxDecoration(color: Color(0xFF7B68EE), shape: BoxShape.circle),
+                    child: Center(child: Text('${e.key + 1}', style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w800))),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(e.value, style: const TextStyle(fontSize: 13, height: 1.6, color: Color(0xFF333333)))),
+                ]),
+              )),
+              const SizedBox(height: 20),
+            ],
+
+            // ── 갈등 해결법 (사주 유료 전용) ─────────────────────────────
+            if (result.isSajuMode && result.conflictResolution != null) ...[
+              _SectionTitle(emoji: '🤝', title: '이 커플의 갈등 해결 비법'),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF43A047).withOpacity(0.3)),
+                ),
+                child: Text(result.conflictResolution!,
+                  style: const TextStyle(fontSize: 14, height: 1.7, color: Color(0xFF2E4F34))),
+              ),
+              const SizedBox(height: 20),
+            ],
+
             // 사주 2단계 전용 섹션
             if (result.isSajuMode) ...[
               // 천생연분 점수
@@ -862,6 +915,109 @@ class _DestinyScoreBar extends StatelessWidget {
         ),
       ),
     ]);
+  }
+}
+
+// ── 스킨십 단계 가이드 ────────────────────────────────────────────────────────
+
+const _skinshipData = [
+  {'emoji': '👀', 'title': '눈 맞춤 & 미소', 'desc': '자연스러운 시선 교환'},
+  {'emoji': '🤝', 'title': '가벼운 신체 접촉', 'desc': '팔 스치기, 어깨 터치'},
+  {'emoji': '🤲', 'title': '손잡기', 'desc': '두근두근 첫 손 잡기'},
+  {'emoji': '💪', 'title': '팔짱 & 어깨 동무', 'desc': '친밀감 UP'},
+  {'emoji': '🤗', 'title': '포옹', 'desc': '따뜻한 감정 나누기'},
+  {'emoji': '😘', 'title': '볼 뽀뽀 & 이마 키스', 'desc': '애정 표현의 시작'},
+  {'emoji': '💋', 'title': '첫 키스', 'desc': '관계의 전환점'},
+];
+
+class _SkinshipGuide extends StatelessWidget {
+  final int recommendedStage;  // 1~7
+  final String advice;
+  const _SkinshipGuide({required this.recommendedStage, required this.advice});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF0F5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFF6B9D).withOpacity(0.3)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // 단계 표시
+        Row(
+          children: List.generate(_skinshipData.length, (i) {
+            final isRecommended = i + 1 == recommendedStage;
+            final isPassed = i + 1 < recommendedStage;
+            return Expanded(
+              child: Column(children: [
+                Container(
+                  width: 32, height: 32,
+                  decoration: BoxDecoration(
+                    color: isRecommended
+                      ? const Color(0xFFFF6B9D)
+                      : isPassed
+                        ? const Color(0xFFFF6B9D).withOpacity(0.3)
+                        : Colors.grey.shade200,
+                    shape: BoxShape.circle,
+                    boxShadow: isRecommended ? [
+                      BoxShadow(color: const Color(0xFFFF6B9D).withOpacity(0.5), blurRadius: 8, spreadRadius: 1),
+                    ] : [],
+                  ),
+                  child: Center(
+                    child: Text(
+                      _skinshipData[i]['emoji'] as String,
+                      style: TextStyle(fontSize: isRecommended ? 16 : 13),
+                    ),
+                  ),
+                ),
+                if (i < _skinshipData.length - 1)
+                  Container(
+                    height: 2,
+                    color: isPassed ? const Color(0xFFFF6B9D).withOpacity(0.4) : Colors.grey.shade200,
+                  ),
+              ]),
+            );
+          }),
+        ),
+        const SizedBox(height: 14),
+
+        // 추천 단계 상세
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFFF6B9D).withOpacity(0.4)),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Text(
+                _skinshipData[recommendedStage - 1]['emoji'] as String,
+                style: const TextStyle(fontSize: 22),
+              ),
+              const SizedBox(width: 8),
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(
+                  '${recommendedStage}단계 추천',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFFFF6B9D), fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  _skinshipData[recommendedStage - 1]['title'] as String,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF333333)),
+                ),
+              ]),
+            ]),
+            if (advice.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(advice, style: const TextStyle(fontSize: 12, height: 1.6, color: Color(0xFF555555))),
+            ],
+          ]),
+        ),
+      ]),
+    );
   }
 }
 
